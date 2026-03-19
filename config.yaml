@@ -1,0 +1,15 @@
+llm:
+  provider: "anthropic"
+  model: "claude-sonnet-4-20250514"
+  temperature: 0.3
+
+research:
+  max_cycles: 5
+  max_sources_per_query: 5
+
+report:
+  output_dir: "./reports"
+
+mcp:
+  server_url: ""
+  transport: "stdio"
