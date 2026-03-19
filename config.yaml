@@ -1,6 +1,6 @@
 llm:
-  provider: "anthropic"
-  model: "claude-sonnet-4-20250514"
+  provider: "openai"
+  model: "gpt-4o-mini"
   temperature: 0.3
 
 research:
