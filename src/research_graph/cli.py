@@ -19,10 +19,34 @@ from research_graph.display import (
 from research_graph.graph import create_research_graph
 
 
-def _create_checkpointer(db_url: str) -> PostgresSaver:
-    checkpointer = PostgresSaver.from_conn_string(db_url)
-    checkpointer.setup()
-    return checkpointer
+def _stream_graph(graph, input_value, thread_config):
+    """Run graph with streaming, printing node progress."""
+    console = get_console()
+    for chunk in graph.stream(input_value, thread_config, stream_mode="updates"):
+        for node_name, update in chunk.items():
+            if node_name == "__interrupt__":
+                continue
+            status = update.get("status", "")
+            findings_count = len(update.get("research_findings", []))
+            if findings_count:
+                console.print(f"  [dim]{node_name}[/dim] — found {findings_count} results")
+            elif status:
+                console.print(f"  [dim]{node_name}[/dim] — {status}")
+            else:
+                console.print(f"  [dim]{node_name}[/dim] — done")
+
+
+def _run_interrupt_loop(graph, thread_config):
+    """Handle pending interrupts until the graph reaches END."""
+    state = graph.get_state(thread_config)
+    while state.tasks:
+        interrupt_task = state.tasks[0]
+        if not interrupt_task.interrupts:
+            break
+        resume_value = _handle_interrupt(interrupt_task.interrupts[0].value)
+        # graph.invoke(Command(resume=resume_value), thread_config)
+        _stream_graph(graph, Command(resume=resume_value), thread_config)
+        state = graph.get_state(thread_config)
 
 
 def _handle_interrupt(interrupt_value: dict):
@@ -88,39 +112,33 @@ def research(topic: str, config_path: str):
     display_header(topic, thread_id)
     display_status("Starting research...")
 
-    checkpointer = _create_checkpointer(db_url)
-    graph = create_research_graph(config, checkpointer=checkpointer)
-    thread_config = {"configurable": {"thread_id": thread_id}}
+    with PostgresSaver.from_conn_string(db_url) as checkpointer:
+        checkpointer.setup()
+        graph = create_research_graph(config, checkpointer=checkpointer)
+        thread_config = {"configurable": {"thread_id": thread_id}}
 
-    initial_state = {
-        "topic": topic,
-        "sub_queries": [],
-        "current_query_index": 0,
-        "research_findings": [],
-        "criticism": "",
-        "critic_approved": False,
-        "research_cycle_count": 0,
-        "final_report": "",
-        "sources": [],
-        "status": "planning",
-    }
+        initial_state = {
+            "topic": topic,
+            "sub_queries": [],
+            "current_query_index": 0,
+            "research_findings": [],
+            "criticism": "",
+            "critic_approved": False,
+            "research_cycle_count": 0,
+            "final_report": "",
+            "sources": [],
+            "status": "planning",
+        }
 
-    graph.invoke(initial_state, thread_config)
+        # graph.invoke(initial_state, thread_config)
+        _stream_graph(graph, initial_state, thread_config)
+        _run_interrupt_loop(graph, thread_config)
 
-    # Interrupt loop: check graph state for pending interrupts
-    state = graph.get_state(thread_config)
-    while state.tasks:
-        interrupt_task = state.tasks[0]
-        if interrupt_task.interrupts:
-            resume_value = _handle_interrupt(interrupt_task.interrupts[0].value)
-            graph.invoke(Command(resume=resume_value), thread_config)
-        state = graph.get_state(thread_config)
-
-    final_state = graph.get_state(thread_config)
-    if final_state.values.get("final_report"):
-        display_report_saved(f"Report generated for thread {thread_id}")
-    else:
-        get_console().print("\n[yellow]Research session ended.[/yellow]")
+        final_state = graph.get_state(thread_config)
+        if final_state.values.get("final_report"):
+            display_report_saved(f"Report generated for thread {thread_id}")
+        else:
+            get_console().print("\n[yellow]Research session ended.[/yellow]")
 
 
 @cli.command()
@@ -136,26 +154,20 @@ def resume(thread_id: str, config_path: str):
         click.echo("Error: SUPABASE_DB_URL not set in .env", err=True)
         raise SystemExit(1)
 
-    checkpointer = _create_checkpointer(db_url)
-    graph = create_research_graph(config, checkpointer=checkpointer)
-    thread_config = {"configurable": {"thread_id": thread_id}}
+    with PostgresSaver.from_conn_string(db_url) as checkpointer:
+        checkpointer.setup()
+        graph = create_research_graph(config, checkpointer=checkpointer)
+        thread_config = {"configurable": {"thread_id": thread_id}}
 
-    graph.invoke(None, thread_config)
+        # graph.invoke(None, thread_config)
+        _stream_graph(graph, None, thread_config)
+        _run_interrupt_loop(graph, thread_config)
 
-    # Interrupt loop: check graph state for pending interrupts
-    state = graph.get_state(thread_config)
-    while state.tasks:
-        interrupt_task = state.tasks[0]
-        if interrupt_task.interrupts:
-            resume_value = _handle_interrupt(interrupt_task.interrupts[0].value)
-            graph.invoke(Command(resume=resume_value), thread_config)
-        state = graph.get_state(thread_config)
-
-    final_state = graph.get_state(thread_config)
-    if final_state.values.get("final_report"):
-        display_report_saved(f"Report generated for thread {thread_id}")
-    else:
-        get_console().print("\n[yellow]Research session ended.[/yellow]")
+        final_state = graph.get_state(thread_config)
+        if final_state.values.get("final_report"):
+            display_report_saved(f"Report generated for thread {thread_id}")
+        else:
+            get_console().print("\n[yellow]Research session ended.[/yellow]")
 
 
 @cli.command()
@@ -174,11 +186,12 @@ def sessions(config_path: str):
     console = get_console()
     console.print("\n[bold]Past Research Sessions:[/bold]\n")
 
-    _create_checkpointer(db_url)
-    table = Table(show_header=True)
-    table.add_column("Thread ID")
-    table.add_column("Status")
-    console.print(table)
+    with PostgresSaver.from_conn_string(db_url) as checkpointer:
+        checkpointer.setup()
+        table = Table(show_header=True)
+        table.add_column("Thread ID")
+        table.add_column("Status")
+        console.print(table)
     console.print(
         "[dim]Tip: Use 'research-graph resume --thread-id <id>' to resume a session.[/dim]"
     )
