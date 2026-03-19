@@ -22,14 +22,29 @@ from research_graph.graph import create_research_graph
 def _stream_graph(graph, input_value, thread_config):
     """Run graph with streaming, printing node progress."""
     console = get_console()
-    for chunk in graph.stream(input_value, thread_config, stream_mode="updates"):
-        for node_name, update in chunk.items():
+    for chunk in graph.stream(input_value, thread_config, stream_mode="updates", subgraphs=True):
+        # With subgraphs=True, chunk is (namespace_tuple, {node: update})
+        if isinstance(chunk, tuple):
+            _namespace, data = chunk
+        else:
+            data = chunk
+        for node_name, update in data.items():
             if node_name == "__interrupt__":
+                continue
+            if not isinstance(update, dict):
+                console.print(f"  [dim]{node_name}[/dim] — done")
                 continue
             status = update.get("status", "")
             findings_count = len(update.get("research_findings", []))
-            if findings_count:
-                console.print(f"  [dim]{node_name}[/dim] — found {findings_count} results")
+            sources_count = len(update.get("sources", []))
+            sub_queries = update.get("sub_queries", [])
+            if sub_queries:
+                console.print(f"  [dim]{node_name}[/dim] — generated {len(sub_queries)} queries")
+            elif findings_count:
+                console.print(
+                    f"  [dim]{node_name}[/dim] — found {findings_count} results, "
+                    f"{sources_count} sources"
+                )
             elif status:
                 console.print(f"  [dim]{node_name}[/dim] — {status}")
             else:
