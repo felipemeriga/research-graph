@@ -68,7 +68,7 @@ def _handle_interrupt(interrupt_value: dict):
     console = get_console()
     action = interrupt_value.get("action", "")
 
-    if "plan" in action.lower() or "sub_queries" in interrupt_value:
+    if "sub_queries" in interrupt_value:
         queries = interrupt_value.get("sub_queries", [])
         display_plan(queries)
         choice = prompt_approval("Approve this plan? [y/n/edit]:")
