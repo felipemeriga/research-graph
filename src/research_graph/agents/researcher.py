@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from langgraph.graph import END, START, StateGraph
@@ -13,7 +14,7 @@ from research_graph.tools.tavily_search import search_web
 logger = logging.getLogger(__name__)
 
 
-async def _research_queries(state: ResearchState, mcp_config: MCPConfig) -> dict:
+async def _research_queries_async(state: ResearchState, mcp_config: MCPConfig) -> dict:
     all_findings = []
     all_sources = []
 
@@ -65,8 +66,8 @@ async def _research_queries(state: ResearchState, mcp_config: MCPConfig) -> dict
 
 
 def create_researcher_graph(mcp_config: MCPConfig) -> StateGraph:
-    async def research(state: ResearchState) -> dict:
-        return await _research_queries(state, mcp_config)
+    def research(state: ResearchState) -> dict:
+        return asyncio.run(_research_queries_async(state, mcp_config))
 
     builder = StateGraph(ResearchState)
     builder.add_node("research", research)
