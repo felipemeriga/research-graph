@@ -17,9 +17,11 @@ def create_tavily_tool(max_results: int = 5) -> TavilySearch:
 def search_web(query: str, max_results: int = 5) -> list[ResearchFinding]:
     if _tavily_tool is None:
         raise RuntimeError("Tavily tool not initialized. Call create_tavily_tool() first.")
-    results = _tavily_tool.invoke(query)
-    if isinstance(results, str):
-        return [{"query": query, "source": "tavily", "content": results, "tool": "tavily"}]
+    raw = _tavily_tool.invoke(query)
+    if isinstance(raw, str):
+        return [{"query": query, "source": "tavily", "content": raw, "tool": "tavily"}]
+    # TavilySearch returns {"query": ..., "results": [...]}
+    results = raw.get("results", []) if isinstance(raw, dict) else raw
     findings: list[ResearchFinding] = []
     for r in results[:max_results]:
         findings.append(
