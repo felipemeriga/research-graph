@@ -9,7 +9,7 @@ from langgraph.graph import END, START, StateGraph
 from research_graph.state import ResearchState
 
 CRITIC_PROMPT = """\
-You are a research critic. Evaluate the research findings against the original topic.
+You are a rigorous research critic. Your job is to find gaps, not to approve.
 
 Topic: {topic}
 Sub-queries investigated: {sub_queries}
@@ -17,18 +17,29 @@ Sub-queries investigated: {sub_queries}
 Findings:
 {findings}
 
-Evaluate whether the findings comprehensively answer the research topic.
+Evaluate the findings using these criteria:
+1. **Coverage** — Are there major angles of the topic that were NOT investigated?
+2. **Depth** — Are findings superficial summaries or do they contain specific data, \
+numbers, examples, or expert opinions?
+3. **Recency** — Is the information current? Flag anything that seems outdated.
+4. **Contradictions** — Do any findings contradict each other? If so, note which ones.
+5. **Source diversity** — Are findings from varied sources, or mostly from one site?
+
+Only approve if the findings would be sufficient to write a thorough, well-sourced report.
+When not approving, suggest 2-3 additional search queries that target the specific gaps \
+you identified (phrased as web searches, not essay questions).
+
 Return ONLY a JSON object with:
 - "approved": true/false
-- "criticism": brief evaluation of what's good and what's missing
-- "additional_queries": list of new sub-queries to investigate (empty if approved)
+- "criticism": your evaluation covering the criteria above (2-4 sentences)
+- "additional_queries": list of new web search queries to fill gaps (empty if approved)
 
 JSON response:"""
 
 
 def _evaluate_findings(state: ResearchState, llm: BaseChatModel) -> dict:
     findings_text = "\n\n".join(
-        f"[{f['tool']}] {f['query']}: {f['content'][:500]}" for f in state["research_findings"]
+        f"[{f['tool']}] {f['query']}: {f['content'][:800]}" for f in state["research_findings"]
     )
     prompt = CRITIC_PROMPT.format(
         topic=state["topic"],
