@@ -11,8 +11,8 @@ from langgraph.graph import END, START, StateGraph
 
 from research_graph.state import ResearchState
 
-WRITER_PROMPT = """You are a research report writer. Synthesize the research findings into a
-well-structured markdown report.
+WRITER_PROMPT = """\
+You are a research report writer producing content for a technical audience.
 
 Topic: {topic}
 
@@ -22,11 +22,24 @@ Research Findings:
 Sources:
 {sources}
 
-Write a comprehensive, well-structured report in markdown format with:
-- A clear title and summary
-- Organized sections based on the sub-topics researched
-- Key findings and insights
-- A sources/references section at the end
+Write a well-structured markdown report following this structure:
+
+1. **Title** — Clear, specific title (not just the topic name)
+2. **TL;DR** — 2-3 sentence summary of the key takeaways
+3. **Body sections** — Organize by theme, not by source. Each section should:
+   - Have a descriptive heading
+   - Synthesize information from multiple findings (don't just list them)
+   - Include specific data, numbers, or examples where available
+   - Cite sources inline as markdown links: [source name](url)
+   - Note any contradictions or debates between sources
+4. **Key Takeaways** — 3-5 bullet points with the most important insights
+5. **References** — All sources as a numbered list with URLs
+
+Writing guidelines:
+- Be specific: prefer "reduced latency by 40%" over "significantly improved performance"
+- When sources disagree, present both sides and note the disagreement
+- Skip sections where you have no substantial findings — don't pad with filler
+- Write for someone who is knowledgeable but unfamiliar with this specific topic
 
 Report:"""
 
@@ -40,7 +53,7 @@ def _slugify(text: str) -> str:
 
 def _write_report(state: ResearchState, llm: BaseChatModel, output_dir: str) -> dict:
     findings_text = "\n\n".join(
-        f"### {f['query']}\nSource: {f['source']} ({f['tool']})\n{f['content'][:1000]}"
+        f"### {f['query']}\nSource: {f['source']} ({f['tool']})\n{f['content'][:2000]}"
         for f in state["research_findings"]
     )
     sources_text = "\n".join(f"- {s}" for s in set(state["sources"]))

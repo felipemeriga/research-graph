@@ -10,8 +10,22 @@ from langgraph.types import Command, interrupt
 
 from research_graph.state import ResearchState
 
-PLANNER_PROMPT = """You are a research planner. Given a research topic, break it down into 3-6
-specific sub-queries that would comprehensively cover the topic.
+PLANNER_PROMPT = """\
+You are a research planner that generates web search queries.
+
+Given a topic, produce 4-6 search queries that:
+1. Are phrased as specific web searches (not essay questions)
+2. Cover different angles: definition/basics, mechanisms/how-it-works, \
+current state/recent developments, comparisons/alternatives, practical implications
+3. Do NOT overlap — each query should target distinct information
+4. Include at least one query targeting recent news or developments \
+(use "2025" or "2026" if relevant)
+
+Bad query: "What are the fundamental principles of aerodynamics?"
+Good query: "how airplane wings generate lift bernoulli vs newton explanation"
+
+Bad query: "What advancements in technology have improved flight?"
+Good query: "newest aircraft fuel efficiency technologies 2025 2026"
 
 Return ONLY a JSON array of strings, no other text.
 
